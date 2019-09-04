@@ -1,5 +1,8 @@
 #%%
 import typing as t
+from os import path as op
+import json
+import itertools
 
 from rdkit import Chem
 import networkx as nx
@@ -9,9 +12,18 @@ __all__ = [
     'MolGraph',
 ]
 
+HBA = '[$([!#6;+0]);!$([F,Cl,Br,I]);!$([o,s,nX3]);!$([Nv5,Pv5,Sv4,Sv6])]'
+HBD = '[!#6;!H0]'
+
 #%%
 class MolGraph(object):
-    def __init__(self, smiles: str):
+    def __init__(self,
+                 smiles: str,
+                 patterns_file: str = op.join(
+                     op.dirname(__file__),
+                     'datasets',
+                     'patterns.json'
+                 )):
         """MolGraph to handel pharmacophore features
         
         Args:
@@ -27,6 +39,11 @@ class MolGraph(object):
         self._h_acceptors = None
         self._h_donors = None
         self._hydrophobic_ids = None
+        self._patterns_file = patterns_file
+        with open(self._patterns_file) as f:
+            self._dic_patterns = json.load(f)
+        self._ion_n = None
+        self._ion_p = None
     
     @property
     def bond_info(self) -> t.List[t.Tuple]:
@@ -97,14 +114,85 @@ class MolGraph(object):
             return self._aromatic_ids
         
     @property
-    def h_acceptors(self):
-        pass
-    
-    @property
-    def h_donors(self):
-        pass
-    
-    @property
-    def hydrophobic_ids(self):
-        pass
+    def h_acceptors(self) -> t.Tuple[t.Tuple]:
+        """Get H bond acceptor atom indices 
         
+        Returns:
+            t.Tuple[t.Tuple]: ummmm
+        """
+        if self._h_acceptors is not None:
+            return self._h_acceptors
+        else:
+            self._h_acceptors = self.mol.GetSubstructMatches(
+                Chem.MolFromSmarts(self._dic_patterns['HBA'])
+            )
+            return self._h_acceptors
+    
+    @property
+    def h_donors(self) -> t.Tuple[t.Tuple]:
+        """Get H bond donor atom indices
+        
+        Returns:
+            t.Tuple[t.Tuple]: ummmm
+        """
+        if self._h_donors is not None:
+            return self._h_donors
+        else:
+            self._h_donors = self.mol.GetSubstructMatches(
+                Chem.MolFromSmarts(self._dic_patterns['HBD'])
+            )
+            return self._h_donors
+    
+    @property
+    def ion_p(self) -> t.Tuple[t.Tuple]:
+        """negatively ionizable groups
+        
+        Returns:
+            t.Tuple[t.Tuple]: ((id, id), (id, id), ) removed empty and duplicate
+                items
+        """
+        if self._ion_p is not None:
+            return self._ion_p
+        else:
+            ls_ids = [
+                self.mol.GetSubstructMatches(
+                    Chem.MolFromSmarts(pattern)
+                ) for pattern in self._dic_patterns['P']
+            ]
+            ids = set(itertools.chain.from_iterable(ls_ids))
+            # ids.remove(())
+            self._ion_p = tuple(ids)
+            # self._ion_p = ls_ids
+            return self._ion_p
+
+    @property
+    def ion_n(self) -> t.Tuple[t.Tuple]:
+        """Positive ionizable groups
+        
+        Returns:
+            t.Tuple[t.Tuple]: ((id, id), (id, id), ) removed empty and duplicate
+                items
+        """
+        if self._ion_n is not None:
+            return self._ion_n
+        else:
+            ls_ids = [
+                self.mol.GetSubstructMatches(
+                    Chem.MolFromSmarts(pattern)
+                ) for pattern in self._dic_patterns['N']
+            ]
+            ids = set(itertools.chain.from_iterable(ls_ids))
+            # ids.remove(())
+            self._ion_n = tuple(ids)
+            # self._ion_p = ls_ids
+            return self._ion_n
+    
+    @property
+    def hydrophobic_ids(self) -> t.Tuple:
+        if self._hydrophobic_ids is not None:
+            return self._hydrophobic_ids
+        else:
+            self._hydrophobic_ids = self.mol.GetSubstructMatches(
+                Chem.MolFromSmarts('A')
+            )
+            return self._hydrophobic_ids
