@@ -1,4 +1,3 @@
-#%%
 import typing as t
 from os import path as op
 import json
@@ -7,15 +6,10 @@ import itertools
 from rdkit import Chem
 import networkx as nx
 
-#%%
 __all__ = [
     'MolGraph',
 ]
 
-HBA = '[$([!#6;+0]);!$([F,Cl,Br,I]);!$([o,s,nX3]);!$([Nv5,Pv5,Sv4,Sv6])]'
-HBD = '[!#6;!H0]'
-
-#%%
 class MolGraph(object):
     def __init__(self,
                  smiles: str,
@@ -148,8 +142,8 @@ class MolGraph(object):
         """negatively ionizable groups
         
         Returns:
-            t.Tuple[t.Tuple]: ((id, id), (id, id), ) removed empty and duplicate
-                items
+            t.Tuple[t.Tuple]: ((id, id), (id, id), ) empty and duplicate items
+                removed
         """
         if self._ion_p is not None:
             return self._ion_p
@@ -160,9 +154,7 @@ class MolGraph(object):
                 ) for pattern in self._dic_patterns['P']
             ]
             ids = set(itertools.chain.from_iterable(ls_ids))
-            # ids.remove(())
             self._ion_p = tuple(ids)
-            # self._ion_p = ls_ids
             return self._ion_p
 
     @property
@@ -170,8 +162,8 @@ class MolGraph(object):
         """Positive ionizable groups
         
         Returns:
-            t.Tuple[t.Tuple]: ((id, id), (id, id), ) removed empty and duplicate
-                items
+            t.Tuple[t.Tuple]: ((id, id), (id, id), ) empty and duplicate items
+                removed
         """
         if self._ion_n is not None:
             return self._ion_n
@@ -182,9 +174,7 @@ class MolGraph(object):
                 ) for pattern in self._dic_patterns['N']
             ]
             ids = set(itertools.chain.from_iterable(ls_ids))
-            # ids.remove(())
             self._ion_n = tuple(ids)
-            # self._ion_p = ls_ids
             return self._ion_n
     
     @property
@@ -193,6 +183,6 @@ class MolGraph(object):
             return self._hydrophobic_ids
         else:
             self._hydrophobic_ids = self.mol.GetSubstructMatches(
-                Chem.MolFromSmarts('A')
+                Chem.MolFromSmarts(self._dic_patterns['H'])
             )
             return self._hydrophobic_ids
