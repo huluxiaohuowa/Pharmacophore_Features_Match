@@ -5,6 +5,9 @@ import itertools
 
 from rdkit import Chem
 import networkx as nx
+from rdkit.Chem import rdmolops
+
+from utils import *
 
 __all__ = [
     'MolGraph',
@@ -24,6 +27,7 @@ class MolGraph(object):
             smiles (str): SMILES of a molecule
         """
         super().__init__()
+        self.smiles = smiles
         self.mol = Chem.MolFromSmiles(smiles)
         self.num_atoms = self.mol.GetNumAtoms()
         self.num_bonds = self.mol.GetNumBonds()
@@ -38,6 +42,38 @@ class MolGraph(object):
             self._dic_patterns = json.load(f)
         self._ion_n = None
         self._ion_p = None
+        self._sssr_list = None
+    
+    @property
+    def sssr_list(self) -> t.List[t.List[int]]:
+        """Get list of list of indices of each ring
+        
+        Returns:
+            t.List[t.List[int]]: list of list of indices of each single ring
+        """
+        if self._sssr_list is not None:
+            return self._sssr_list
+        else:
+            self._sssr_list = [
+                list(ring) for ring in rdmolops.GetSymmSSSR(self.mol)
+            ]
+            return self._sssr_list
+    
+    @property
+    def sssr(self):
+        pass
+
+    @property
+    def chains(self):
+        sssr = self.sssr_list
+        list_atom_idx = list(range(self.mol.GetNumAtoms()))
+        sssr_tmp = []
+        for i_sssr in sssr:
+            sssr_tmp += i_sssr
+        sssr_list = list(set(sssr_tmp))
+        list_atom_removed_idx = list(set(list_atom_idx).difference(set(sssr_list)))
+        return list_atom_removed_idx
+
     
     @property
     def bond_info(self) -> t.List[t.Tuple]:
@@ -76,11 +112,11 @@ class MolGraph(object):
         return self._graph
     
     @property
-    def aromatic_ids(self) -> t.List[int]:
+    def aromatic_ids(self) -> t.List[t.List[int]]:
         """aromatic pharmacophore atom list
         
         Returns:
-            t.List[int]: [int, int, ...]
+            t.List[t.List[int]]: [[int, int, ...], ...]
         """
         if self._aromatic_ids is not None:
             return self._aromatic_ids
@@ -178,11 +214,20 @@ class MolGraph(object):
             return self._ion_n
     
     @property
-    def hydrophobic_ids(self) -> t.Tuple:
+    def hydrophobic_ids(self) -> t.List:
+        """Get hydrophobic atoms indices
+        
+        Returns:
+            t.List: list of hydrophobic atom indices
+        """
         if self._hydrophobic_ids is not None:
             return self._hydrophobic_ids
         else:
-            self._hydrophobic_ids = self.mol.GetSubstructMatches(
+            hydrophobic_ids = self.mol.GetSubstructMatches(
                 Chem.MolFromSmarts(self._dic_patterns['H'])
             )
+            self._hydrophobic_ids = list(itertools.chain.from_iterable(
+                hydrophobic_ids
+            ))
             return self._hydrophobic_ids
+    
