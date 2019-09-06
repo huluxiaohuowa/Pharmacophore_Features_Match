@@ -8,7 +8,7 @@ from rdkit import Chem
 import networkx as nx
 from rdkit.Chem import rdmolops
 
-from utils import *
+# from utils import *
 
 __all__ = [
     'MolGraph',
