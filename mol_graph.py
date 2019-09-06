@@ -2,6 +2,7 @@ import typing as t
 from os import path as op
 import json
 import itertools
+from copy import deepcopy
 
 from rdkit import Chem
 import networkx as nx
@@ -43,6 +44,12 @@ class MolGraph(object):
         self._ion_n = None
         self._ion_p = None
         self._sssr_list = None
+        self._chains = None
+        self._rings = None
+        self._nonring_bond_info = None
+        self._cracked_graph = None
+        self._hydrophobic_rings = None
+        self._hydrophobic_chains = None
     
     @property
     def sssr_list(self) -> t.List[t.List[int]]:
@@ -60,20 +67,95 @@ class MolGraph(object):
             return self._sssr_list
     
     @property
-    def sssr(self):
+    def sssr(self): #TODO I don't know what to do
         pass
 
     @property
-    def chains(self):
-        sssr = self.sssr_list
-        list_atom_idx = list(range(self.mol.GetNumAtoms()))
-        sssr_tmp = []
-        for i_sssr in sssr:
-            sssr_tmp += i_sssr
-        sssr_list = list(set(sssr_tmp))
-        list_atom_removed_idx = list(set(list_atom_idx).difference(set(sssr_list)))
-        return list_atom_removed_idx
-
+    def chains(self) -> t.List[t.List]:
+        """Get chains atom indices
+        
+        Returns:
+            t.List[t.List]: [[chain1 atoms], [chain2 atoms], ...]
+        """
+        if self._chains is not None:
+            return self._chains
+        else:
+            sssr_atoms = itertools.chain.from_iterable(self.sssr_list)
+            chains_subgraph = deepcopy(self.graph)
+            chains_subgraph.remove_nodes_from(sssr_atoms)
+            cracked_chains = nx.connected_component_subgraphs(chains_subgraph)
+            self._chains = [
+                list(i_graph.nodes) for i_graph in cracked_chains
+            ]
+            return self._chains
+    
+    @property
+    def nonring_bond_info(self) -> t.Tuple[t.Tuple]:
+        """non ring bond info mathed by SMARTS
+        
+        Returns:
+            t.Tuple[t.Tuple]: tuple of tuple of atom pairs
+        """
+        if self._nonring_bond_info is not None:
+            return self._nonring_bond_info
+        else:
+            self._nonring_bond_info = self.mol.GetSubstructMatches(
+                Chem.MolFromSmarts(self._dic_patterns['non_ring_bonds'])
+            )
+            return self._nonring_bond_info
+    
+    @property
+    def bidirect_non_ring_bond_info(self) -> t.Tuple[t.Tuple]:
+        """Zi ji kan
+        
+        Returns:
+            t.Tuple[t.Tuple]: bidirected nonring bond info, eg. 
+                (
+                    (0, 1),
+                    (0, 2),
+                    ...
+                    (1, 0),
+                    (2, 0)    
+                ) 
+        """
+        reversed_bond_info = tuple([
+            bond_info[::-1] for bond_info in self.nonring_bond_info
+        ])
+        new_bond_info = self.nonring_bond_info + reversed_bond_info
+        return new_bond_info
+        
+    # @property
+    # def cracked_graph(self):
+    #     graph = deepcopy(self.graph)
+    #     for i_edge in graph.edges:
+    #         on = False
+    #         for ring in self.sssr_list:
+    #             if i_edge[0] not in ring and i_edge[1] not in ring:
+    #                 on = True
+    #                 break
+    #         if not on:
+    #             graph.remove_edge(i_edge[0], i_edge[1])
+    
+    @property
+    def rings_assems(self) -> t.List[t.List]:
+        """ring assemblies atoms
+        
+        Returns:
+            t.List[t.List]: list of list of each ring assembly atoms
+        """
+        if self._rings is not None:
+            return self._rings
+        else:
+            ring_assesms_subgraph = deepcopy(self.graph)
+            ring_assesms_subgraph.remove_edges_from(
+                self.bidirect_non_ring_bond_info
+            )
+            cracked_ra = nx.connected_component_subgraphs(ring_assesms_subgraph)
+            self._rings = [
+                list(i_graph.nodes) for i_graph in cracked_ra
+                if len(i_graph.nodes) > 1
+            ]
+            return self._rings
     
     @property
     def bond_info(self) -> t.List[t.Tuple]:
@@ -231,3 +313,45 @@ class MolGraph(object):
             ))
             return self._hydrophobic_ids
     
+    @property
+    def hydrophobic_rings(self) -> t.List[t.List]:
+        """Get hydrophobic ring assemblies
+        
+        Returns:
+            t.List[t.List]: list of list of each hydrophobic ring assembliy
+                atoms
+        """
+        if self._hydrophobic_rings is not None:
+            return self._hydrophobic_rings
+        else:
+            self._hydrophobic_rings = [
+                ls_atoms for ls_atoms in self.rings_assems
+                if set(ls_atoms).issubset(set(self.hydrophobic_ids))
+            ]
+            return self._hydrophobic_rings
+    
+    @property
+    def hydrophobic_chains(self) -> t.List[t.List]:
+        """Get hydrophobic chains
+        
+        Returns:
+            t.List[t.List]: list of list of each hydrophobic chain, including
+                linkers and side chains
+        """
+        if self._hydrophobic_chains is not None:
+            return self._hydrophobic_chains
+        else:
+            self._hydrophobic_chains =[
+                ls_atoms for ls_atoms in self.chains
+                if set(ls_atoms).issubset(set(self.hydrophobic_ids))
+            ]
+            return self._hydrophobic_chains
+    
+    @property
+    def hydrophobic_groups(self) -> t.List[t.List]:
+        """Compliation of hydrophobic rings and hydrophobic chains
+        
+        Returns:
+            t.List[t.List]: list of list of hydrophobic group atoms
+        """
+        return self.hydrophobic_chains + self.hydrophobic_rings 
