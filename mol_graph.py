@@ -39,7 +39,7 @@ class MolGraph(object):
         self._h_donors = None
         self._hydrophobic_ids = None
         self._patterns_file = patterns_file
-        with open(self._patterns_file) as f:
+        with open(patterns_file) as f:
             self._dic_patterns = json.load(f)
         self._ion_n = None
         self._ion_p = None
