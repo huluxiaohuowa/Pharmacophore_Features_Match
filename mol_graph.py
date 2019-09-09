@@ -26,7 +26,7 @@ class MolGraph(object):
             'patterns.json'
         )
     ):
-        """MolGraph to handel pharmacophore features
+        """MolGraph to handle pharmacophore features
         
         Args:
             smiles (str): SMILES of a molecule
@@ -331,7 +331,7 @@ class MolGraph(object):
             ids = set(itertools.chain.from_iterable(ls_ids))
             self._ion_n = tuple(ids)
             return self._ion_n
-    
+
     @property
     def hydrophobic_ids(self) -> t.List:
         """Get hydrophobic atoms indices
