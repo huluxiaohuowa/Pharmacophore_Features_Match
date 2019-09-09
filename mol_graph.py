@@ -1,6 +1,8 @@
+"""Definition of MolGraph to match a molecule with it`s pharmacophore feats"""
 import typing as t
 from os import path as op
 import json
+from collections import Counter
 import itertools
 from copy import deepcopy
 
@@ -15,13 +17,15 @@ __all__ = [
 ]
 
 class MolGraph(object):
-    def __init__(self,
-                 smiles: str,
-                 patterns_file: str = op.join(
-                     op.dirname(__file__),
-                     'datasets',
-                     'patterns.json'
-                 )):
+    def __init__(
+        self,
+        smiles: str,
+        patterns_file: str = op.join(
+            op.dirname(__file__),
+            'datasets',
+            'patterns.json'
+        )
+    ):
         """MolGraph to handel pharmacophore features
         
         Args:
@@ -50,6 +54,16 @@ class MolGraph(object):
         self._cracked_graph = None
         self._hydrophobic_rings = None
         self._hydrophobic_chains = None
+        self._non_hydrophobic_ids = None
+        self._hydrophobic_subgraphs = None
+        self._side_hydrophobic_groups = None
+        self._side_chains = None
+        self._side_rings = None
+        self._num_bonds_per_atom = None
+        self._side_atoms = None
+        self._side_chain_hydrophobic_subgraphs_idx = None
+        self._side_ring_hydrophobic_subgraphs_idx = None
+        self._murko = None
     
     @property
     def sssr_list(self) -> t.List[t.List[int]]:
@@ -66,10 +80,6 @@ class MolGraph(object):
             ]
             return self._sssr_list
     
-    @property
-    def sssr(self): #TODO I don't know what to do
-        pass
-
     @property
     def chains(self) -> t.List[t.List]:
         """Get chains atom indices
@@ -178,11 +188,38 @@ class MolGraph(object):
         return self._bond_info
 
     @property
-    def graph(self) -> nx.Graph:
-        """MolGraph
+    def num_bonds_per_atom(self) -> t.Counter:
+        """Num of bonds of each atom
         
         Returns:
-            nx.classes.graph.Graph: 
+            t.Counter: {atom1: num_of_bonds, atom2: num_of_bonds, ...}
+        """
+        if self._num_bonds_per_atom is not None:
+            return self._num_bonds_per_atom
+        else:
+            bond_info_flat = list(itertools.chain.from_iterable(self.bond_info))
+            self._num_bonds_per_atom = Counter(bond_info_flat)
+            return self._num_bonds_per_atom
+    
+    @property
+    def side_atoms(self) -> t.List:
+        """Side atom indices
+        
+        Returns:
+            t.List: list of indices of side atoms (only one bond connected) 
+        """
+        if self._side_atoms is None:
+            self._side_atoms = [
+                i for (i, j) in self.num_bonds_per_atom.items() if j == 1
+            ]
+        return self._side_atoms
+        
+    @property
+    def graph(self) -> nx.Graph:
+        """Transform the molecule to a nx.Graph object
+        
+        Returns:
+            nx.Graph: 
         """
         if self._graph is not None:
             return self._graph
@@ -314,6 +351,39 @@ class MolGraph(object):
             return self._hydrophobic_ids
     
     @property
+    def non_hydrophobic_ids(self) -> t.List:
+        """Non-hydrophobic atom idices
+        
+        Returns:
+            t.List: list of non-hydrophobic atom indices
+        """
+        if self._non_hydrophobic_ids is not None:
+            return self._non_hydrophobic_ids
+        else:
+            self._non_hydrophobic_ids = list(
+                set(range(self.num_atoms)) - set(self.hydrophobic_ids)
+            )
+            return self._non_hydrophobic_ids
+    
+    @property
+    def hydrophobic_subgraphs(self) -> t.List[nx.Graph]:
+        """Hydrophobic subgraphs of a molecule
+        
+        Returns:
+            t.List[nx.Graph]: list of subgraphs of the molecule
+        """
+        if self._hydrophobic_subgraphs is not None:
+            return self._hydrophobic_subgraphs
+        else:
+            graph_tmp = deepcopy(self.graph)
+            graph_tmp.remove_nodes_from(self.non_hydrophobic_ids)
+            subgraphs = list(
+                nx.connected_component_subgraphs(graph_tmp)
+            )
+            self._hydrophobic_subgraphs = subgraphs
+            return self._hydrophobic_subgraphs
+    
+    @property
     def hydrophobic_rings(self) -> t.List[t.List]:
         """Get hydrophobic ring assemblies
         
@@ -355,3 +425,106 @@ class MolGraph(object):
             t.List[t.List]: list of list of hydrophobic group atoms
         """
         return self.hydrophobic_chains + self.hydrophobic_rings 
+    
+    @property
+    def side_chain_hydrophobic_subgraphs_idx(self) -> t.Set:
+        if self._side_chain_hydrophobic_subgraphs_idx is None:
+            graph_idx = set([
+                idx
+                for idx, i_graph in enumerate(self.hydrophobic_subgraphs)
+                if any (set(i_graph.nodes) & set(self.side_atoms))
+            ])
+            # graphs = [
+            #     self.hydrophobic_subgraphs[i] for i in graph_idx
+            # ]
+            self._side_chain_hydrophobic_subgraphs_idx = graph_idx
+        return self._side_chain_hydrophobic_subgraphs_idx
+    
+    @property
+    def side_ring_hydrophobic_subgraphs_idx(self) -> t.Set:
+        if self._side_ring_hydrophobic_subgraphs_idx is None:
+            graph_idx = set([
+                idx
+                for idx, i_graph in enumerate(self.hydrophobic_subgraphs)
+                if any (
+                    set(i_graph.nodes) & 
+                    set(itertools.chain.from_iterable(self.side_rings))
+                )
+            ])
+            self._side_ring_hydrophobic_subgraphs_idx = graph_idx
+        return self._side_ring_hydrophobic_subgraphs_idx
+    
+    @property
+    def side_hydrophobic_subgraphs_idx(self) -> t.Set:
+        return (
+            self._side_chain_hydrophobic_subgraphs_idx | 
+            self._side_ring_hydrophobic_subgraphs_idx
+        )
+    
+    @property
+    def side_hydrophobic_subgraphs(self) -> t.List[nx.Graph]:
+        return [
+            self.hydrophobic_subgraphs[idx] 
+            for idx in self.side_hydrophobic_subgraphs_idx
+        ]
+    
+    @property
+    def side_hydrophobic_atoms(self) -> t.List[t.List[int]]:
+        return [
+            list(graph.nodes) for graph in self.side_hydrophobic_subgraphs
+        ]
+    # @property
+    # def side_chains(self) -> t.List[t.List[int]]:
+    #     if self._side_chains is not None:
+    #         self._side_chains = [
+    #             ls_atoms
+    #             for ls_atoms in self.chains
+    #             if any (
+    #                 set(self.side_atoms) & set(ls_atoms)
+    #             )
+    #         ]
+    #         return self._side_chains
+    #     else:
+    #         return self._side_chains
+    
+    @property
+    def murko(self) -> nx.Graph:
+        if self._murko is None:
+            murko = deepcopy(self.graph)
+            while True:
+                bond_info_flat = list(itertools.chain.from_iterable(
+                    murko.edges
+                )) 
+                num_bonds = Counter(bond_info_flat)
+                side_atoms = [
+                    atom_idx
+                    for atom_idx in num_bonds
+                    if num_bonds[atom_idx] == 1
+                ]
+                if not(side_atoms):
+                    break
+                else:
+                    murko.remove_nodes_from(side_atoms)
+            self._murko = murko
+        return self._murko
+     
+    @property
+    def side_rings(self) -> t.List[t.List[int]]:
+        if self._side_rings is None:
+            self._side_rings = []
+            for ring in self.sssr_list:
+                graph = deepcopy(self.murko)
+                graph.remove_nodes_from(ring)
+                if nx.is_connected(graph):
+                    self._side_rings.append(ring)
+            return self._side_rings
+        else:
+            return self._side_rings
+    
+    @property
+    def side_hydrophobic_groups(self) -> t.List[t.List[int]]:
+        if self._side_hydrophobic_groups is not None:
+            return self._side_hydrophobic_groups
+        else:
+            self._side_hydrophobic_groups = []
+            return self._side_hydrophobic_groups
