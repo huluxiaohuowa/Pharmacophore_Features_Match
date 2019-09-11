@@ -377,10 +377,9 @@ class MolGraph(object):
         else:
             graph_tmp = deepcopy(self.graph)
             graph_tmp.remove_nodes_from(self.non_hydrophobic_ids)
-            subgraphs = list(
+            self._hydrophobic_subgraphs = list(
                 nx.connected_component_subgraphs(graph_tmp)
             )
-            self._hydrophobic_subgraphs = subgraphs
             return self._hydrophobic_subgraphs
     
     @property
@@ -457,8 +456,8 @@ class MolGraph(object):
     @property
     def side_hydrophobic_subgraphs_idx(self) -> t.Set:
         return (
-            self._side_chain_hydrophobic_subgraphs_idx | 
-            self._side_ring_hydrophobic_subgraphs_idx
+            self.side_chain_hydrophobic_subgraphs_idx | 
+            self.side_ring_hydrophobic_subgraphs_idx
         )
     
     @property
