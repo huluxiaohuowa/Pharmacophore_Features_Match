@@ -1,4 +1,4 @@
-"""Definition of MolGraph to match a molecule with it`s pharmacophore feats"""
+"""Definition of MolGraph to match a molecule with its pharmacophore feats"""
 import typing as t
 from os import path as op
 import json
@@ -16,6 +16,7 @@ __all__ = [
     'MolGraph',
 ]
 
+
 class MolGraph(object):
     def __init__(
         self,
@@ -27,7 +28,7 @@ class MolGraph(object):
         )
     ):
         """MolGraph to handle pharmacophore features
-        
+
         Args:
             smiles (str): SMILES of a molecule
         """
@@ -64,11 +65,11 @@ class MolGraph(object):
         self._side_chain_hydrophobic_subgraphs_idx = None
         self._side_ring_hydrophobic_subgraphs_idx = None
         self._murko = None
-    
+
     @property
     def sssr_list(self) -> t.List[t.List[int]]:
         """Get list of list of indices of each ring
-        
+
         Returns:
             t.List[t.List[int]]: list of list of indices of each single ring
         """
@@ -79,11 +80,11 @@ class MolGraph(object):
                 list(ring) for ring in rdmolops.GetSymmSSSR(self.mol)
             ]
             return self._sssr_list
-    
+
     @property
     def chains(self) -> t.List[t.List]:
         """Get chains atom indices
-        
+
         Returns:
             t.List[t.List]: [[chain1 atoms], [chain2 atoms], ...]
         """
@@ -98,11 +99,11 @@ class MolGraph(object):
                 list(i_graph.nodes) for i_graph in cracked_chains
             ]
             return self._chains
-    
+
     @property
     def nonring_bond_info(self) -> t.Tuple[t.Tuple]:
         """non ring bond info mathed by SMARTS
-        
+
         Returns:
             t.Tuple[t.Tuple]: tuple of tuple of atom pairs
         """
@@ -113,27 +114,27 @@ class MolGraph(object):
                 Chem.MolFromSmarts(self._dic_patterns['non_ring_bonds'])
             )
             return self._nonring_bond_info
-    
+
     @property
     def bidirect_non_ring_bond_info(self) -> t.Tuple[t.Tuple]:
         """Zi ji kan
-        
+
         Returns:
-            t.Tuple[t.Tuple]: bidirected nonring bond info, eg. 
+            t.Tuple[t.Tuple]: bidirected nonring bond info, eg.
                 (
                     (0, 1),
                     (0, 2),
                     ...
                     (1, 0),
-                    (2, 0)    
-                ) 
+                    (2, 0)
+                )
         """
         reversed_bond_info = tuple([
             bond_info[::-1] for bond_info in self.nonring_bond_info
         ])
         new_bond_info = self.nonring_bond_info + reversed_bond_info
         return new_bond_info
-        
+
     # @property
     # def cracked_graph(self):
     #     graph = deepcopy(self.graph)
@@ -145,11 +146,11 @@ class MolGraph(object):
     #                 break
     #         if not on:
     #             graph.remove_edge(i_edge[0], i_edge[1])
-    
+
     @property
     def rings_assems(self) -> t.List[t.List]:
         """ring assemblies atoms
-        
+
         Returns:
             t.List[t.List]: list of list of each ring assembly atoms
         """
@@ -166,15 +167,15 @@ class MolGraph(object):
                 if len(i_graph.nodes) > 1
             ]
             return self._rings
-    
+
     @property
     def bond_info(self) -> t.List[t.Tuple]:
         """Bond info for a molecule
-        
+
         Returns:
             t.List[t.Tuple]:
                 [
-                    (bond start atom_idx, bond end atom_idx), 
+                    (bond start atom_idx, bond end atom_idx),
                     ...
                 ]
         """
@@ -190,7 +191,7 @@ class MolGraph(object):
     @property
     def num_bonds_per_atom(self) -> t.Counter:
         """Num of bonds of each atom
-        
+
         Returns:
             t.Counter: {atom1: num_of_bonds, atom2: num_of_bonds, ...}
         """
@@ -200,26 +201,26 @@ class MolGraph(object):
             bond_info_flat = list(itertools.chain.from_iterable(self.bond_info))
             self._num_bonds_per_atom = Counter(bond_info_flat)
             return self._num_bonds_per_atom
-    
+
     @property
     def side_atoms(self) -> t.List:
         """Side atom indices
-        
+
         Returns:
-            t.List: list of indices of side atoms (only one bond connected) 
+            t.List: list of indices of side atoms (only one bond connected)
         """
         if self._side_atoms is None:
             self._side_atoms = [
                 i for (i, j) in self.num_bonds_per_atom.items() if j == 1
             ]
         return self._side_atoms
-        
+
     @property
     def graph(self) -> nx.Graph:
         """Transform the molecule to a nx.Graph object
-        
+
         Returns:
-            nx.Graph: 
+            nx.Graph:
         """
         if self._graph is not None:
             return self._graph
@@ -229,11 +230,11 @@ class MolGraph(object):
             graph.add_edges_from(self.bond_info)
             self._graph = graph
         return self._graph
-    
+
     @property
     def aromatic_ids(self) -> t.List[t.List[int]]:
         """aromatic pharmacophore atom list
-        
+
         Returns:
             t.List[t.List[int]]: [[int, int, ...], ...]
         """
@@ -255,17 +256,17 @@ class MolGraph(object):
                 nx.connected_component_subgraphs(
                     aromatic_graph
                 )
-            ) 
+            )
             aromatic_ids = [
                 list(sub_graph.nodes) for sub_graph in aromatic_subgraphs
             ]
             self._aromatic_ids = aromatic_ids
             return self._aromatic_ids
-        
+
     @property
     def h_acceptors(self) -> t.Tuple[t.Tuple]:
-        """Get H bond acceptor atom indices 
-        
+        """Get H bond acceptor atom indices
+
         Returns:
             t.Tuple[t.Tuple]: ummmm
         """
@@ -276,11 +277,11 @@ class MolGraph(object):
                 Chem.MolFromSmarts(self._dic_patterns['HBA'])
             )
             return self._h_acceptors
-    
+
     @property
     def h_donors(self) -> t.Tuple[t.Tuple]:
         """Get H bond donor atom indices
-        
+
         Returns:
             t.Tuple[t.Tuple]: ummmm
         """
@@ -291,11 +292,11 @@ class MolGraph(object):
                 Chem.MolFromSmarts(self._dic_patterns['HBD'])
             )
             return self._h_donors
-    
+
     @property
     def ion_p(self) -> t.Tuple[t.Tuple]:
         """negatively ionizable groups
-        
+
         Returns:
             t.Tuple[t.Tuple]: ((id, id), (id, id), ) empty and duplicate items
                 removed
@@ -315,7 +316,7 @@ class MolGraph(object):
     @property
     def ion_n(self) -> t.Tuple[t.Tuple]:
         """Positive ionizable groups
-        
+
         Returns:
             t.Tuple[t.Tuple]: ((id, id), (id, id), ) empty and duplicate items
                 removed
@@ -335,7 +336,7 @@ class MolGraph(object):
     @property
     def hydrophobic_ids(self) -> t.List:
         """Get hydrophobic atoms indices
-        
+
         Returns:
             t.List: list of hydrophobic atom indices
         """
@@ -349,11 +350,11 @@ class MolGraph(object):
                 hydrophobic_ids
             ))
             return self._hydrophobic_ids
-    
+
     @property
     def non_hydrophobic_ids(self) -> t.List:
         """Non-hydrophobic atom idices
-        
+
         Returns:
             t.List: list of non-hydrophobic atom indices
         """
@@ -364,11 +365,11 @@ class MolGraph(object):
                 set(range(self.num_atoms)) - set(self.hydrophobic_ids)
             )
             return self._non_hydrophobic_ids
-    
+
     @property
     def hydrophobic_subgraphs(self) -> t.List[nx.Graph]:
         """Hydrophobic subgraphs of a molecule
-        
+
         Returns:
             t.List[nx.Graph]: list of subgraphs of the molecule
         """
@@ -381,11 +382,11 @@ class MolGraph(object):
                 nx.connected_component_subgraphs(graph_tmp)
             )
             return self._hydrophobic_subgraphs
-    
+
     @property
     def hydrophobic_rings(self) -> t.List[t.List]:
         """Get hydrophobic ring assemblies
-        
+
         Returns:
             t.List[t.List]: list of list of each hydrophobic ring assembliy
                 atoms
@@ -398,11 +399,11 @@ class MolGraph(object):
                 if set(ls_atoms).issubset(set(self.hydrophobic_ids))
             ]
             return self._hydrophobic_rings
-    
+
     @property
     def hydrophobic_chains(self) -> t.List[t.List]:
         """Get hydrophobic chains
-        
+
         Returns:
             t.List[t.List]: list of list of each hydrophobic chain, including
                 linkers and side chains
@@ -410,63 +411,63 @@ class MolGraph(object):
         if self._hydrophobic_chains is not None:
             return self._hydrophobic_chains
         else:
-            self._hydrophobic_chains =[
+            self._hydrophobic_chains = [
                 ls_atoms for ls_atoms in self.chains
                 if set(ls_atoms).issubset(set(self.hydrophobic_ids))
             ]
             return self._hydrophobic_chains
-    
+
     @property
     def hydrophobic_groups(self) -> t.List[t.List]:
         """Compliation of hydrophobic rings and hydrophobic chains
-        
+
         Returns:
             t.List[t.List]: list of list of hydrophobic group atoms
         """
-        return self.hydrophobic_chains + self.hydrophobic_rings 
-    
+        return self.hydrophobic_chains + self.hydrophobic_rings
+
     @property
     def side_chain_hydrophobic_subgraphs_idx(self) -> t.Set:
         if self._side_chain_hydrophobic_subgraphs_idx is None:
             graph_idx = set([
                 idx
                 for idx, i_graph in enumerate(self.hydrophobic_subgraphs)
-                if any (set(i_graph.nodes) & set(self.side_atoms))
+                if any(set(i_graph.nodes) & set(self.side_atoms))
             ])
             # graphs = [
             #     self.hydrophobic_subgraphs[i] for i in graph_idx
             # ]
             self._side_chain_hydrophobic_subgraphs_idx = graph_idx
         return self._side_chain_hydrophobic_subgraphs_idx
-    
+
     @property
     def side_ring_hydrophobic_subgraphs_idx(self) -> t.Set:
         if self._side_ring_hydrophobic_subgraphs_idx is None:
             graph_idx = set([
                 idx
                 for idx, i_graph in enumerate(self.hydrophobic_subgraphs)
-                if any (
-                    set(i_graph.nodes) & 
+                if any(
+                    set(i_graph.nodes) &
                     set(itertools.chain.from_iterable(self.side_rings))
                 )
             ])
             self._side_ring_hydrophobic_subgraphs_idx = graph_idx
         return self._side_ring_hydrophobic_subgraphs_idx
-    
+
     @property
     def side_hydrophobic_subgraphs_idx(self) -> t.Set:
         return (
-            self.side_chain_hydrophobic_subgraphs_idx | 
+            self.side_chain_hydrophobic_subgraphs_idx |
             self.side_ring_hydrophobic_subgraphs_idx
         )
-    
+
     @property
     def side_hydrophobic_subgraphs(self) -> t.List[nx.Graph]:
         return [
-            self.hydrophobic_subgraphs[idx] 
+            self.hydrophobic_subgraphs[idx]
             for idx in self.side_hydrophobic_subgraphs_idx
         ]
-    
+
     @property
     def side_hydrophobic_atoms(self) -> t.List[t.List[int]]:
         return [
@@ -485,7 +486,7 @@ class MolGraph(object):
     #         return self._side_chains
     #     else:
     #         return self._side_chains
-    
+
     @property
     def murko(self) -> nx.Graph:
         if self._murko is None:
@@ -493,7 +494,7 @@ class MolGraph(object):
             while True:
                 bond_info_flat = list(itertools.chain.from_iterable(
                     murko.edges
-                )) 
+                ))
                 num_bonds = Counter(bond_info_flat)
                 side_atoms = [
                     atom_idx
@@ -506,7 +507,7 @@ class MolGraph(object):
                     murko.remove_nodes_from(side_atoms)
             self._murko = murko
         return self._murko
-     
+
     @property
     def side_rings(self) -> t.List[t.List[int]]:
         if self._side_rings is None:
@@ -519,7 +520,7 @@ class MolGraph(object):
             return self._side_rings
         else:
             return self._side_rings
-    
+
     @property
     def side_hydrophobic_groups(self) -> t.List[t.List[int]]:
         if self._side_hydrophobic_groups is not None:
