@@ -20,8 +20,8 @@ __all__ = [
 class MolGraph(object):
     def __init__(
         self,
-        smiles: str,
-        patterns_file: str = op.join(
+        smiles: t.Union[str, Chem.Mol],
+        patterns_file: str=op.join(
             op.dirname(__file__),
             'datasets',
             'patterns.json'
@@ -33,8 +33,12 @@ class MolGraph(object):
             smiles (str): SMILES of a molecule
         """
         super().__init__()
-        self.smiles = smiles
-        self.mol = Chem.MolFromSmiles(smiles)
+        if isinstance(smiles, str):
+            self.mol = Chem.MolFromSmiles(smiles)
+        elif isinstance(smiles, Chem.Mol):
+            self.mol = smiles
+        else:
+            raise TypeError
         self.num_atoms = self.mol.GetNumAtoms()
         self.num_bonds = self.mol.GetNumBonds()
         self._graph = None
