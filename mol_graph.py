@@ -516,11 +516,14 @@ class MolGraph(object):
     def side_rings(self) -> t.List[t.List[int]]:
         if self._side_rings is None:
             self._side_rings = []
-            for ring in self.sssr_list:
-                graph = deepcopy(self.murko)
-                graph.remove_nodes_from(ring)
-                if nx.is_connected(graph):
-                    self._side_rings.append(ring)
+            if len(self.sssr_list) == 1:
+                self._side_rings = deepcopy(self.sssr_list)
+            else:
+                for ring in self.sssr_list:
+                    graph = deepcopy(self.murko)
+                    graph.remove_nodes_from(ring)
+                    if nx.is_connected(graph):
+                        self._side_rings.append(ring)
             return self._side_rings
         else:
             return self._side_rings
